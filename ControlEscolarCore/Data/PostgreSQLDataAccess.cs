@@ -20,23 +20,66 @@ namespace ControlEscolarCore.Data
         //Logger usando el LoggingManager centralizado
         private static readonly Logger _logger = LoggingManager.GetLogger("ControlEscolar.Data.PostgreSQLDataAccess");
         //Cadena de conexión desde App.config
-        private static readonly string _ConnectionString = ConfigurationManager.ConnectionStrings["ConexionBD"].ConnectionString;
+        //private static readonly string _ConnectionString = ConfigurationManager.ConnectionStrings["ConexionBD"].ConnectionString;
+        // Campo estático para almacenar la cadena de conexión
+        private static string _connectionString;
+
         private NpgsqlConnection _connection;
         private static PostgreSQLDataAccess? _instance;
+
+        // Propiedad para establecer la cadena de conexión desde el API
+        public static string ConnectionString
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_connectionString))
+                {
+                    try
+                    {
+                        // Intenta obtener desde ConfigurationManager (Windows Forms)
+                        _connectionString = ConfigurationManager.ConnectionStrings["ConexionBD"]?.ConnectionString;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn(ex, "No se pudo obtener la cadena de conexión desde ConfigurationManager");
+                    }
+                }
+                return _connectionString;
+            }
+            set { _connectionString = value; }
+        }
 
         /// <summary>
         /// Constructor privado para evitar instanciación directa (patrón Singleton)
         /// </summary>
-        public PostgreSQLDataAccess() 
+        //public PostgreSQLDataAccess() 
+        //{
+        //    try
+        //    {
+        //        _connection = new NpgsqlConnection(_ConnectionString);
+        //        _logger.Info("Conexión a base de datos creada");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Fatal(ex, "Error al crear la conexión a la base de datos");
+        //        throw;
+        //    }
+        //}
+        private PostgreSQLDataAccess()
         {
             try
             {
-                _connection = new NpgsqlConnection(_ConnectionString);
-                _logger.Info("Conexión a base de datos creada");
+                if (string.IsNullOrEmpty(ConnectionString))
+                {
+                    throw new InvalidOperationException("La cadena de conexión no está configurada. Asegúrate de establecer PostgreSQLDataAccess.ConnectionString antes de usar la clase.");
+                }
+
+                _connection = new NpgsqlConnection(ConnectionString);
+                _logger.Info("Instancia de acceso a datos creada correctamente");
             }
             catch (Exception ex)
             {
-                _logger.Fatal(ex, "Error al crear la conexión a la base de datos");
+                _logger.Fatal(ex, "Error al inicializar el acceso a la base de datos");
                 throw;
             }
         }
