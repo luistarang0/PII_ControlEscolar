@@ -2,29 +2,38 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copiar toda la solución primero
+# Copiar toda la solución
 COPY . ./
 
-# Listar los directorios para depuración
+# Listar contenido para depuración
 RUN ls -la
 
-# Intentar construir solo el proyecto API
-RUN find . -name "API_Estudiantes_Test.csproj" -exec dotnet publish {} -c Release -o /app/out \;
+# Restaurar dependencias y publicar la API
+RUN dotnet restore "API_Estudiantes_Test/API_Estudiantes_Test.csproj" || \
+    dotnet restore "*/API_Estudiantes_Test.csproj" || \
+    echo "No se encontró el proyecto API_Estudiantes_Test.csproj"
 
-# Si lo anterior falla, intentar buscar la API por nombre
-RUN if [ ! -d /app/out ]; then \
-    find . -name "*.csproj" | grep -i api | xargs -I {} dotnet publish {} -c Release -o /app/out; \
-    fi
+# Publicar la API
+RUN dotnet publish "API_Estudiantes_Test/API_Estudiantes_Test.csproj" -c Release -o /app/out || \
+    dotnet publish "*/API_Estudiantes_Test.csproj" -c Release -o /app/out || \
+    echo "No se pudo publicar el proyecto API"
+
+# Verificar que se generó un archivo DLL válido
+RUN ls -la /app/out
 
 # Etapa final
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app/out .
+
+# Exponer puertos
 EXPOSE 80
 EXPOSE 443
+EXPOSE 8080
+EXPOSE 5000
 
-# Buscar el nombre exacto del DLL de la API
-RUN find . -name "*.dll" | grep -i api
+# Configuración de variables de entorno para Render
+ENV ASPNETCORE_URLS=http://+:8080
 
-# Entrypoint dinámico que busca el archivo API.dll
-ENTRYPOINT ["sh", "-c", "dotnet $(find . -name \"*API.dll\" | head -1)"]
+# Punto de entrada específico
+ENTRYPOINT ["dotnet", "API_Estudiantes_Test.dll"]
